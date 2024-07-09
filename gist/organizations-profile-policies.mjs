@@ -7,6 +7,8 @@
  * After:
  *  Save the code to organizations-profile-policies.mjs (or any other name ending with .mjs)
  *  Run on your terminal the following command: node organizations-profile-policies.mjs
+ *
+ * Note: Remove  `--profile ${awsProfile}` if you have set `export AWS_PROFILE=YOUR_PROFILE`
  */
 
 import { writeFile } from "node:fs/promises";
@@ -17,6 +19,7 @@ const execPromise = promisify(exec);
 
 const execCommand = async (command) => {
   try {
+    // const cmd = `xyz_pre_command -- ${command}`; and replace command
     console.log(`execute command: ${command}`);
     const { stdout, stderr } = await execPromise(command);
     if (stdout) {
@@ -61,7 +64,7 @@ const getPoliciesByTargetId = async (targetId, awsProfile) => {
   const policies = { ...SCPs };
   for (const policyType in SCPs) {
     const policiesTarget = await execCommand(
-      `aws organizations list-policies-for-target --filter ${policyType} --target-id ${targetId} --profile ${awsProfile} --no-paginate`
+      `aws organizations list-policies-for-target --filter ${policyType} --target-id ${targetId} --profile ${awsProfile}`
     );
     policies[policyType] = policiesTarget["Policies"];
   }
@@ -69,16 +72,14 @@ const getPoliciesByTargetId = async (targetId, awsProfile) => {
 };
 
 const getRootUsers = async (awsProfile) => {
-  const rootsUsers = await execCommand(
-    `aws organizations list-roots --profile ${awsProfile} --no-paginate`
-  );
+  const rootsUsers = await execCommand(`aws organizations list-roots --profile ${awsProfile}`);
   return rootsUsers["Roots"];
 };
 
 const getSCPs = async (awsProfile) => {
   for (const policyType in SCPs) {
     const allPoliciesByType = await execCommand(
-      `aws organizations list-policies --filter ${policyType} --profile ${awsProfile} --no-paginate`
+      `aws organizations list-policies --filter ${policyType} --profile ${awsProfile}`
     );
 
     POLICIES["SCPs"][policyType] = {};
@@ -86,7 +87,7 @@ const getSCPs = async (awsProfile) => {
     for (const policyTypeObj of allPoliciesByType["Policies"]) {
       const policyId = policyTypeObj["Id"];
       const policyDescription = await execCommand(
-        `aws organizations describe-policy --policy-id ${policyId} --profile ${awsProfile} --no-paginate`
+        `aws organizations describe-policy --policy-id ${policyId} --profile ${awsProfile}`
       );
       POLICIES["SCPs"][policyType][policyId] = {
         ...policyDescription["Policy"],
@@ -97,7 +98,7 @@ const getSCPs = async (awsProfile) => {
 
 const getOrgUnits = async (orgOUs = {}, parentID, awsProfile) => {
   const orgChildrenForOU = await execCommand(
-    `aws organizations list-children --child-type ORGANIZATIONAL_UNIT --parent-id ${parentID} --profile ${awsProfile} --no-paginate`
+    `aws organizations list-children --child-type ORGANIZATIONAL_UNIT --parent-id ${parentID} --profile ${awsProfile}`
   );
 
   const childrenOrgOUs = orgChildrenForOU["Children"];
@@ -108,7 +109,7 @@ const getOrgUnits = async (orgOUs = {}, parentID, awsProfile) => {
 
   for (let child of childrenOrgOUs) {
     const ou = await execCommand(
-      `aws organizations describe-organizational-unit --organizational-unit-id ${child["Id"]} --profile ${awsProfile} --no-paginate`
+      `aws organizations describe-organizational-unit --organizational-unit-id ${child["Id"]} --profile ${awsProfile}`
     );
     orgOUs[child["Id"]] = {
       ...ou["OrganizationalUnit"],
@@ -121,14 +122,15 @@ const getOrgUnits = async (orgOUs = {}, parentID, awsProfile) => {
 };
 
 const getACCs = async (awsProfile) => {
-  const orgACCs = await execCommand(
-    `aws organizations list-accounts --profile ${awsProfile} --no-paginate`
-  );
+  const orgACCs = await execCommand(`aws organizations list-accounts --profile ${awsProfile}`);
 
   for (const orgAcc of orgACCs["Accounts"]) {
     POLICIES["ACCs"][orgAcc["Id"]] = {
       ...orgAcc,
       ...(await getPoliciesByTargetId(orgAcc["Id"], awsProfile)),
+      ...(await execCommand(
+        `aws organizations list-parents --child-id ${orgAcc["Id"]} --profile ${awsProfile}`
+      )),
     };
   }
 };

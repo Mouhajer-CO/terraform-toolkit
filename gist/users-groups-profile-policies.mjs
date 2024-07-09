@@ -7,6 +7,8 @@
  * After:
  *  Save the code to users-groups-profile-policies.mjs (or any other name ending with .mjs)
  *  Run on your terminal the following command: node users-groups-profile-policies.mjs
+ *
+ * * Note: Remove  `--profile ${awsProfile}` if you have set `export AWS_PROFILE=YOUR_PROFILE`
  */
 
 import { writeFile } from "node:fs/promises";
@@ -49,7 +51,7 @@ const USER_GROUP_PROFILE_POLICIES = {
 const getUsersAndGroupsPoliciesPerProfile = async (awsProfile) => {
   // Get all users for the AWS Profile ACCOUNT
   const users = await execCommand(
-    `aws iam list-users --profile ${awsProfile} --no-paginate`
+    `aws iam list-users --profile ${awsProfile}`
   );
 
   // Create Users object and get the list attached policies per user
@@ -58,7 +60,7 @@ const getUsersAndGroupsPoliciesPerProfile = async (awsProfile) => {
 
     // Managed Policies
     const attachedPolicies = await execCommand(
-      `aws iam list-attached-user-policies --user-name ${userName} --profile ${awsProfile} --no-paginate`
+      `aws iam list-attached-user-policies --user-name ${userName} --profile ${awsProfile}`
     );
 
     USER_GROUP_PROFILE_POLICIES["Users"][userName] = {
@@ -81,13 +83,13 @@ const getUsersAndGroupsPoliciesPerProfile = async (awsProfile) => {
 
     // Inline Policies attached to User
     const inlineUserPolicies = await execCommand(
-      `aws iam list-user-policies --user-name ${userName} --profile ${awsProfile} --no-paginate`
+      `aws iam list-user-policies --user-name ${userName} --profile ${awsProfile}`
     );
 
     for (const key in inlineUserPolicies["PolicyNames"]) {
       const policyName = inlineUserPolicies["PolicyNames"][key];
       const policyDocument = await execCommand(
-        `aws iam get-user-policy --user-name ${userName} --policy-name ${policyName} --profile ${awsProfile} --no-paginate`
+        `aws iam get-user-policy --user-name ${userName} --policy-name ${policyName} --profile ${awsProfile}`
       );
 
       USER_GROUP_PROFILE_POLICIES["Users"][userName]["InlineUserPolicies"].push(
@@ -100,14 +102,14 @@ const getUsersAndGroupsPoliciesPerProfile = async (awsProfile) => {
 
     // Group Policies
     const groups = await execCommand(
-      `aws iam list-groups-for-user --user-name ${userName} --profile ${awsProfile} --no-paginate`
+      `aws iam list-groups-for-user --user-name ${userName} --profile ${awsProfile}`
     );
 
     for (const group of groups["Groups"]) {
       const groupName = group["GroupName"];
 
       const groupAttachedPolicies = await execCommand(
-        `aws iam list-attached-group-policies --group-name ${groupName} --profile ${awsProfile} --no-paginate`
+        `aws iam list-attached-group-policies --group-name ${groupName} --profile ${awsProfile}`
       );
 
       USER_GROUP_PROFILE_POLICIES["Users"][userName]["GroupNames"][groupName] =
@@ -128,12 +130,12 @@ const getUsersAndGroupsPoliciesPerProfile = async (awsProfile) => {
 
       // Inline Policies attached to Group
       const inlineGroupPolicies = await execCommand(
-        `aws iam list-group-policies --group-name ${groupName} --profile ${awsProfile} --no-paginate`
+        `aws iam list-group-policies --group-name ${groupName} --profile ${awsProfile}`
       );
 
       for (const policyName of inlineGroupPolicies["PolicyNames"]) {
         const policyDocument = await execCommand(
-          `aws iam get-group-policy --group-name ${groupName} --policy-name ${policyName} --profile ${awsProfile} --no-paginate`
+          `aws iam get-group-policy --group-name ${groupName} --policy-name ${policyName} --profile ${awsProfile}`
         );
 
         USER_GROUP_PROFILE_POLICIES["Users"][userName][
@@ -150,10 +152,10 @@ const getUsersAndGroupsPoliciesPerProfile = async (awsProfile) => {
   // Iterate on AttachedPolicies, policyArn = USER_GROUP_PROFILE_POLICIES.AttachedPolicies.[*].PolicyArn
   for (const policyArn of USER_GROUP_PROFILE_POLICIES["PoliciesArn"]) {
     const policy = await execCommand(
-      `aws iam get-policy --policy-arn ${policyArn} --profile ${awsProfile} --no-paginate`
+      `aws iam get-policy --policy-arn ${policyArn} --profile ${awsProfile}`
     );
     const policyVersion = await execCommand(
-      `aws iam get-policy-version --policy-arn ${policyArn} --version-id ${policy["Policy"]["DefaultVersionId"]} --profile ${awsProfile} --no-paginate`
+      `aws iam get-policy-version --policy-arn ${policyArn} --version-id ${policy["Policy"]["DefaultVersionId"]} --profile ${awsProfile}`
     );
 
     USER_GROUP_PROFILE_POLICIES["PoliciesDocument"][policyArn] = {
